@@ -106,7 +106,6 @@ function getCityCode(feature) {
   return p.N03_007 ?? p.code ?? p.id ?? "";
 }
 
-// SVGパスに直接長押しイベントを登録
 function attachLongPressToLayer(geoJsonLayer, getName) {
   geoJsonLayer.eachLayer(layer => {
     const el = layer._path;
@@ -118,6 +117,7 @@ function attachLongPressToLayer(geoJsonLayer, getName) {
     el.addEventListener('touchstart', () => {
       longPressed = false;
       pressTimer = setTimeout(() => {
+        longPressed = true;
         showMessage(getName(layer));
       }, 500);
     }, { passive: true });
@@ -126,7 +126,6 @@ function attachLongPressToLayer(geoJsonLayer, getName) {
       clearTimeout(pressTimer);
       pressTimer = null;
       if (longPressed) {
-        // 長押し後のclickイベントをキャンセル
         el.addEventListener('click', e => {
           e.stopPropagation();
           e.preventDefault();
@@ -229,8 +228,18 @@ function renderPrefProgressList() {
     return ca - cb;
   });
   prefProgressListEl.innerHTML = rows
-    .map(r => `<div class="pref-row">${r.prefName}：${r.hit}/${r.total}（${r.pct.toFixed(1)}%）</div>`)
+    .map(r => `<div class="pref-row pref-row-link" data-pref="${r.prefName}">${r.prefName}：${r.hit}/${r.total}（${r.pct.toFixed(1)}%）</div>`)
     .join("");
+
+  prefProgressListEl.querySelectorAll('.pref-row-link').forEach(el => {
+    el.addEventListener('click', () => {
+      const prefName = el.dataset.pref;
+      const file = getCityGeojsonPathByPrefName(prefName);
+      if (!file) return;
+      closePrefProgressList();
+      loadCitiesGeojson(file, prefName);
+    });
+  });
 }
 
 function openPrefProgressList() {
@@ -339,7 +348,6 @@ function drawPrefectures() {
   attachLongPressToLayer(currentLayer, layer => {
     return layer.feature.properties?.nam_ja || "不明";
   });
-  
 }
 
 function loadCitiesGeojson(file, prefName) {
@@ -451,7 +459,6 @@ function showCities(featureCollection, prefName) {
   attachLongPressToLayer(currentLayer, layer => {
     return getCityName(layer.feature);
   });
-  
 }
 
 function showHoverTooltip(text, latlng) {
