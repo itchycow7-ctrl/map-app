@@ -113,8 +113,10 @@ function attachLongPressToLayer(geoJsonLayer, getName) {
     if (!el) return;
 
     let pressTimer = null;
+    let longPressed = false;
 
     el.addEventListener('touchstart', () => {
+      longPressed = false;
       pressTimer = setTimeout(() => {
         showMessage(getName(layer));
       }, 500);
@@ -123,11 +125,20 @@ function attachLongPressToLayer(geoJsonLayer, getName) {
     el.addEventListener('touchend', () => {
       clearTimeout(pressTimer);
       pressTimer = null;
+      if (longPressed) {
+        // 長押し後のclickイベントをキャンセル
+        el.addEventListener('click', e => {
+          e.stopPropagation();
+          e.preventDefault();
+        }, { once: true, capture: true });
+      }
+      longPressed = false;
     });
 
     el.addEventListener('touchmove', () => {
       clearTimeout(pressTimer);
       pressTimer = null;
+      longPressed = false;
     });
   });
 }
