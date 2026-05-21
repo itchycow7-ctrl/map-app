@@ -1,13 +1,12 @@
 // iOSの虫眼鏡・長押しメニューを無効化
 document.addEventListener('touchstart', function(e) {
-  if (e.touches.length > 1) return; // ピンチズームは許可
+  if (e.touches.length > 1) return;
 }, { passive: false });
 
 document.addEventListener('contextmenu', function(e) {
   e.preventDefault();
 });
 
-// Leaflet地図上での長押しデフォルト動作を無効化
 const mapEl = document.getElementById('map');
 if (mapEl) {
   mapEl.addEventListener('touchstart', function(e) {
@@ -17,8 +16,9 @@ if (mapEl) {
   mapEl.addEventListener('contextmenu', function(e) {
     e.preventDefault();
   });
-}// 県名 → 都道府県コード（01〜47）
+}
 
+// 県名 → 都道府県コード（01〜47）
 const prefCodeByName = {
   "北海道": "01",
   "青森県": "02",
@@ -86,30 +86,22 @@ const map = L.map("map", {
 let prefData;
 let currentLayer = null;
 
-// hover用（1個だけ使い回し）
 let hoverTooltip = null;
 
-// visited: 市区町村コード配列（localStorage）
 let visited = JSON.parse(localStorage.getItem("visitedCities") || "[]");
 
 const backBtn = document.getElementById("backBtn");
 const message = document.getElementById("message");
 const progressEl = document.getElementById("progress");
 
-// 県別リスト表示エリア（#progressの下）
 const prefProgressListEl = document.getElementById("prefProgressList");
 let prefListOpen = false;
 
-// 「今表示している都道府県」
 let currentPrefName = null;
-
-// 「今の都道府県に含まれる市区町村コード一覧（Set）」
 let currentPrefCityCodes = new Set();
 
-// 全国（トップページ）進捗の分母（固定値）
 const NATIONAL_MUNICIPALITIES = 1741;
 
-// 県名 → その県に含まれる市区町村コードSet（県別GeoJSONから構築）
 const prefCityCodesMap = new Map();
 
 function normalizeCode(v) {
@@ -120,7 +112,6 @@ function getVisitedSet() {
   return new Set((visited || []).map(normalizeCode).filter(Boolean));
 }
 
-// FeatureCollection に正規化
 function normalizeToFeatureCollection(gj) {
   if (!gj) return { type: "FeatureCollection", features: [] };
   if (gj.type === "FeatureCollection" && Array.isArray(gj.features)) return gj;
@@ -129,13 +120,11 @@ function normalizeToFeatureCollection(gj) {
   return { type: "FeatureCollection", features: [] };
 }
 
-// 市区町村名
 function getCityName(feature) {
   const p = feature.properties || {};
   return p.N03_004 || p.N03_003 || p.city || p.name || "不明";
 }
 
-// 市区町村コード
 function getCityCode(feature) {
   const p = feature.properties || {};
   return p.N03_007 ?? p.code ?? p.id ?? "";
@@ -172,13 +161,9 @@ async function buildPrefCityCodesMap() {
         const r = await fetch(file);
         const data = await r.json();
         const fc = normalizeToFeatureCollection(data);
-
         const set = new Set(
-          fc.features
-            .map(f => normalizeCode(getCityCode(f)))
-            .filter(Boolean)
+          fc.features.map(f => normalizeCode(getCityCode(f))).filter(Boolean)
         );
-
         prefCityCodesMap.set(prefName, set);
       } catch (e) {
         prefCityCodesMap.set(prefName, new Set());
@@ -190,7 +175,6 @@ async function buildPrefCityCodesMap() {
 function getPrefVisitedRatio(prefName) {
   const citySet = prefCityCodesMap.get(prefName);
   if (!citySet || citySet.size === 0) return 0;
-
   const visitedSet = getVisitedSet();
   let hit = 0;
   for (const code of citySet) {
@@ -199,13 +183,8 @@ function getPrefVisitedRatio(prefName) {
   return hit / citySet.size;
 }
 
-function lerp(a, b, t) {
-  return a + (b - a) * t;
-}
-
-function clamp01(x) {
-  return Math.max(0, Math.min(1, x));
-}
+function lerp(a, b, t) { return a + (b - a) * t; }
+function clamp01(x) { return Math.max(0, Math.min(1, x)); }
 
 function orangeGradient(t) {
   t = clamp01(t);
@@ -219,14 +198,11 @@ function orangeGradient(t) {
 
 function renderPrefProgressList() {
   if (!prefProgressListEl) return;
-
   if (!prefCityCodesMap || prefCityCodesMap.size === 0) {
     prefProgressListEl.innerHTML = "<div>集計中...</div>";
     return;
   }
-
   const visitedSet = getVisitedSet();
-
   const rows = Object.keys(prefCodeByName).map(prefName => {
     const citySet = prefCityCodesMap.get(prefName) || new Set();
     const total = citySet.size;
@@ -237,13 +213,11 @@ function renderPrefProgressList() {
     const pct = total ? (hit / total) * 100 : 0;
     return { prefName, hit, total, pct };
   });
-
   rows.sort((a, b) => {
     const ca = Number(prefCodeByName[a.prefName] || 999);
     const cb = Number(prefCodeByName[b.prefName] || 999);
     return ca - cb;
   });
-
   prefProgressListEl.innerHTML = rows
     .map(r => `<div class="pref-row">${r.prefName}：${r.hit}/${r.total}（${r.pct.toFixed(1)}%）</div>`)
     .join("");
@@ -291,12 +265,7 @@ function drawPrefectures() {
       const prefName = feature.properties?.nam_ja || "不明";
       const ratio = getPrefVisitedRatio(prefName);
       const fill = orangeGradient(ratio);
-      return {
-        color: "#000",
-        weight: 1,
-        fillColor: fill,
-        fillOpacity: 0.75
-      };
+      return { color: "#000", weight: 1, fillColor: fill, fillOpacity: 0.75 };
     },
 
     onEachFeature: (feature, layer) => {
@@ -313,28 +282,33 @@ function drawPrefectures() {
         layer.setStyle({ weight: 1 });
       });
 
+      let pressTimer = null;
+      let longPressed = false;
+
+      layer.on("touchstart", () => {
+        longPressed = false;
+        pressTimer = setTimeout(() => {
+          longPressed = true;
+          showMessage(prefName);
+        }, 500);
+      });
+      layer.on("touchend touchcancel", () => {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      });
+      layer.on("touchmove", () => {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      });
+
       layer.on("click", () => {
+        if (longPressed) { longPressed = false; return; }
         const file = getCityGeojsonPathByPrefName(prefName);
         if (!file) {
           showMessage(`${prefName} はコード解決できません`);
           return;
         }
         loadCitiesGeojson(file, prefName);
-      });
-
-      let pressTimer = null;
-      layer.on("mousedown touchstart", () => {
-        pressTimer = setTimeout(() => {
-          showMessage(prefName);
-        }, 600);
-      });
-      layer.on("mouseup touchend touchcancel mouseleave", () => {
-        clearTimeout(pressTimer);
-        pressTimer = null;
-      });
-      layer.on("mousemove touchmove", () => {
-        clearTimeout(pressTimer);
-        pressTimer = null;
       });
     }
   }).addTo(map);
@@ -357,9 +331,7 @@ function showCities(featureCollection, prefName) {
 
   currentPrefName = prefName || null;
   currentPrefCityCodes = new Set(
-    featureCollection.features
-      .map(f => normalizeCode(getCityCode(f)))
-      .filter(Boolean)
+    featureCollection.features.map(f => normalizeCode(getCityCode(f))).filter(Boolean)
   );
 
   updateProgressView();
@@ -394,37 +366,39 @@ function showCities(featureCollection, prefName) {
         layer.setStyle({ weight: 1 });
       });
 
+      let pressTimer = null;
+      let longPressed = false;
+
+      layer.on("touchstart", () => {
+        longPressed = false;
+        pressTimer = setTimeout(() => {
+          longPressed = true;
+          showMessage(name);
+        }, 500);
+      });
+      layer.on("touchend touchcancel", () => {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      });
+      layer.on("touchmove", () => {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      });
+
       layer.on("click", () => {
+        if (longPressed) { longPressed = false; return; }
         if (!code) {
           showMessage("コードが取得できません");
           return;
         }
-
         toggleVisit(code);
-
         const visitedFlag = getVisitedSet().has(code);
         layer.setStyle({
           fillColor: visitedFlag ? "orange" : "#ffffff",
           fillOpacity: visitedFlag ? 0.7 : 0.15
         });
-
         updateProgressView();
         if (prefListOpen) renderPrefProgressList();
-      });
-
-      let pressTimer = null;
-      layer.on("mousedown touchstart", () => {
-        pressTimer = setTimeout(() => {
-          showMessage(name);
-        }, 600);
-      });
-      layer.on("mouseup touchend touchcancel mouseleave", () => {
-        clearTimeout(pressTimer);
-        pressTimer = null;
-      });
-      layer.on("mousemove touchmove", () => {
-        clearTimeout(pressTimer);
-        pressTimer = null;
       });
     }
   }).addTo(map);
@@ -434,11 +408,7 @@ function showCities(featureCollection, prefName) {
 
 function showHoverTooltip(text, latlng) {
   if (!hoverTooltip) {
-    hoverTooltip = L.tooltip({
-      sticky: false,
-      direction: "top",
-      opacity: 0.9
-    });
+    hoverTooltip = L.tooltip({ sticky: false, direction: "top", opacity: 0.9 });
   }
   hoverTooltip.setContent(text);
   hoverTooltip.setLatLng(latlng);
@@ -446,21 +416,15 @@ function showHoverTooltip(text, latlng) {
 }
 
 function clearHoverTooltip() {
-  if (hoverTooltip) {
-    map.removeLayer(hoverTooltip);
-  }
+  if (hoverTooltip) map.removeLayer(hoverTooltip);
 }
 
 function toggleVisit(code) {
   const c = normalizeCode(code);
   if (!c) return;
-
   const visitedSet = getVisitedSet();
   if (visitedSet.has(c)) {
-    visited = (visited || [])
-      .map(normalizeCode)
-      .filter(Boolean)
-      .filter(v => v !== c);
+    visited = (visited || []).map(normalizeCode).filter(Boolean).filter(v => v !== c);
   } else {
     visited = (visited || []).map(normalizeCode).filter(Boolean);
     visited.push(c);
