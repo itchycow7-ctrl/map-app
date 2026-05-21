@@ -78,8 +78,6 @@ function getCityGeojsonPathByPrefName(prefName) {
 const map = L.map("map", {
   attributionControl: false,
   zoomControl: false,
-  tap: false,
-  tapTolerance: 0,
   bounceAtZoomLimits: false
 }).setView([36.2, 138.2], 5);
 
