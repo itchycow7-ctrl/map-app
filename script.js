@@ -106,6 +106,32 @@ function getCityCode(feature) {
   return p.N03_007 ?? p.code ?? p.id ?? "";
 }
 
+// SVGパスに直接長押しイベントを登録
+function attachLongPressToLayer(geoJsonLayer, getName) {
+  geoJsonLayer.eachLayer(layer => {
+    const el = layer._path;
+    if (!el) return;
+
+    let pressTimer = null;
+
+    el.addEventListener('touchstart', () => {
+      pressTimer = setTimeout(() => {
+        showMessage(getName(layer));
+      }, 500);
+    }, { passive: true });
+
+    el.addEventListener('touchend', () => {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    });
+
+    el.addEventListener('touchmove', () => {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    });
+  });
+}
+
 function updateProgressView() {
   if (!progressEl) return;
   if (currentPrefName && currentPrefCityCodes.size > 0) {
@@ -298,6 +324,11 @@ function drawPrefectures() {
   }).addTo(map);
 
   map.fitBounds(currentLayer.getBounds());
+
+  attachLongPressToLayer(currentLayer, layer => {
+    return layer.feature.properties?.nam_ja || "不明";
+  });
+  
 }
 
 function loadCitiesGeojson(file, prefName) {
@@ -405,6 +436,11 @@ function showCities(featureCollection, prefName) {
   }).addTo(map);
 
   map.fitBounds(currentLayer.getBounds());
+
+  attachLongPressToLayer(currentLayer, layer => {
+    return getCityName(layer.feature);
+  });
+  
 }
 
 function showHoverTooltip(text, latlng) {
