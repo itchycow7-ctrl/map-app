@@ -1,4 +1,4 @@
-const CACHE_NAME = 'map-app-v1';
+const CACHE_NAME = 'map-app-v2';
 const ASSETS = [
   './',
   './index.html',
