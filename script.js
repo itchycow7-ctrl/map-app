@@ -85,23 +85,17 @@ const map = L.map("map", {
 
 let prefData;
 let currentLayer = null;
-
 let hoverTooltip = null;
-
 let visited = JSON.parse(localStorage.getItem("visitedCities") || "[]");
 
 const backBtn = document.getElementById("backBtn");
 const message = document.getElementById("message");
 const progressEl = document.getElementById("progress");
-
 const prefProgressListEl = document.getElementById("prefProgressList");
 let prefListOpen = false;
-
 let currentPrefName = null;
 let currentPrefCityCodes = new Set();
-
 const NATIONAL_MUNICIPALITIES = 1741;
-
 const prefCityCodesMap = new Map();
 
 function normalizeCode(v) {
@@ -132,7 +126,6 @@ function getCityCode(feature) {
 
 function updateProgressView() {
   if (!progressEl) return;
-
   if (currentPrefName && currentPrefCityCodes.size > 0) {
     const visitedSet = getVisitedSet();
     let hit = 0;
@@ -144,7 +137,6 @@ function updateProgressView() {
     progressEl.textContent = `${currentPrefName}\n${hit}/${total}（${pct.toFixed(1)}%）`;
     return;
   }
-
   const hit = getVisitedSet().size;
   const total = NATIONAL_MUNICIPALITIES;
   const pct = total ? (hit / total) * 100 : 0;
@@ -153,7 +145,6 @@ function updateProgressView() {
 
 async function buildPrefCityCodesMap() {
   const entries = Object.entries(prefCodeByName);
-
   await Promise.all(
     entries.map(async ([prefName, code]) => {
       const file = `geojson/municipality/${code}.json`;
@@ -292,17 +283,28 @@ function drawPrefectures() {
           showMessage(prefName);
         }, 500);
       });
-      layer.on("touchend touchcancel", () => {
+
+      layer.on("touchend", () => {
         clearTimeout(pressTimer);
-        pressTimer = null;
-      });
-      layer.on("touchmove", () => {
-        clearTimeout(pressTimer);
+        if (!longPressed) {
+          const file = getCityGeojsonPathByPrefName(prefName);
+          if (!file) {
+            showMessage(`${prefName} はコード解決できません`);
+            return;
+          }
+          loadCitiesGeojson(file, prefName);
+        }
+        longPressed = false;
         pressTimer = null;
       });
 
+      layer.on("touchmove touchcancel", () => {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+        longPressed = false;
+      });
+
       layer.on("click", () => {
-        if (longPressed) { longPressed = false; return; }
         const file = getCityGeojsonPathByPrefName(prefName);
         if (!file) {
           showMessage(`${prefName} はコード解決できません`);
@@ -376,17 +378,34 @@ function showCities(featureCollection, prefName) {
           showMessage(name);
         }, 500);
       });
-      layer.on("touchend touchcancel", () => {
+
+      layer.on("touchend", () => {
         clearTimeout(pressTimer);
-        pressTimer = null;
-      });
-      layer.on("touchmove", () => {
-        clearTimeout(pressTimer);
+        if (!longPressed) {
+          if (!code) {
+            showMessage("コードが取得できません");
+            return;
+          }
+          toggleVisit(code);
+          const visitedFlag = getVisitedSet().has(code);
+          layer.setStyle({
+            fillColor: visitedFlag ? "orange" : "#ffffff",
+            fillOpacity: visitedFlag ? 0.7 : 0.15
+          });
+          updateProgressView();
+          if (prefListOpen) renderPrefProgressList();
+        }
+        longPressed = false;
         pressTimer = null;
       });
 
+      layer.on("touchmove touchcancel", () => {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+        longPressed = false;
+      });
+
       layer.on("click", () => {
-        if (longPressed) { longPressed = false; return; }
         if (!code) {
           showMessage("コードが取得できません");
           return;
