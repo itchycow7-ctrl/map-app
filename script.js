@@ -1,22 +1,6 @@
-// iOSの虫眼鏡・長押しメニューを無効化
-document.addEventListener('touchstart', function(e) {
-  if (e.touches.length > 1) return;
-}, { passive: false });
-
 document.addEventListener('contextmenu', function(e) {
   e.preventDefault();
 });
-
-const mapEl = document.getElementById('map');
-if (mapEl) {
-  mapEl.addEventListener('touchstart', function(e) {
-    e.stopPropagation();
-  }, { passive: true });
-
-  mapEl.addEventListener('contextmenu', function(e) {
-    e.preventDefault();
-  });
-}
 
 // 県名 → 都道府県コード（01〜47）
 const prefCodeByName = {
