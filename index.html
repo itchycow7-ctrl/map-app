@@ -2,7 +2,7 @@
 <html lang="ja">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
     <title>行ったことある市区町村マップ</title>
 
     <!-- Leaflet -->
@@ -19,6 +19,7 @@
         -webkit-user-select: none;
         user-select: none;
       }
+
       html,
       body {
         height: 100%;
@@ -28,6 +29,9 @@
       }
 
       #map {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
         height: 100%;
         width: 100%;
       }
@@ -42,7 +46,7 @@
         flex-direction: column;
         align-items: flex-end;
         gap: 8px;
-        pointer-events: none; /* map操作を邪魔しない */
+        pointer-events: none;
       }
 
       /* ただし中身はクリックできるようにする */
@@ -100,6 +104,14 @@
         user-select: none;
       }
 
+      /* Leafletのズームボタン */
+      .leaflet-control-zoom a {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        pointer-events: auto;
+      }
+
       /* 画面下メッセージ（トースト） */
       #message {
         position: absolute;
@@ -130,7 +142,7 @@
         });
       }
     </script>
-    
+
   </head>
 
   <body>
@@ -152,7 +164,6 @@
       crossorigin=""
     ></script>
 
-    <!-- あなたの完全版 script.js を読み込む -->
     <script src="./script.js"></script>
   </body>
 </html>
