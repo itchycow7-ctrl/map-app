@@ -1,4 +1,24 @@
-// 県名 → 都道府県コード（01〜47）
+// iOSの虫眼鏡・長押しメニューを無効化
+document.addEventListener('touchstart', function(e) {
+  if (e.touches.length > 1) return; // ピンチズームは許可
+}, { passive: false });
+
+document.addEventListener('contextmenu', function(e) {
+  e.preventDefault();
+});
+
+// Leaflet地図上での長押しデフォルト動作を無効化
+const mapEl = document.getElementById('map');
+if (mapEl) {
+  mapEl.addEventListener('touchstart', function(e) {
+    e.stopPropagation();
+  }, { passive: true });
+
+  mapEl.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+  });
+}// 県名 → 都道府県コード（01〜47）
+
 const prefCodeByName = {
   "北海道": "01",
   "青森県": "02",
@@ -55,7 +75,12 @@ function getCityGeojsonPathByPrefName(prefName) {
   return `geojson/municipality/${code}.json`;
 }
 
-const map = L.map("map", { attributionControl: false }).setView([36.2, 138.2], 5);
+const map = L.map("map", {
+  attributionControl: false,
+  tap: false,
+  tapTolerance: 0,
+  bounceAtZoomLimits: false
+}).setView([36.2, 138.2], 5);
 
 let prefData;
 let currentLayer = null;
