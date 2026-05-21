@@ -118,7 +118,6 @@ function getCityCode(feature) {
 function updateProgressView() {
   if (!progressEl) return;
 
-  // 県表示中：県の分母はGeoJSONベース（= 今開いてる県のfeature由来コード数）
   if (currentPrefName && currentPrefCityCodes.size > 0) {
     const visitedSet = getVisitedSet();
     let hit = 0;
@@ -131,16 +130,14 @@ function updateProgressView() {
     return;
   }
 
-  // 全国表示（トップページ）：分母は固定値 1741
   const hit = getVisitedSet().size;
   const total = NATIONAL_MUNICIPALITIES;
   const pct = total ? (hit / total) * 100 : 0;
   progressEl.textContent = `全国\n${hit}/${total}（${pct.toFixed(1)}%）`;
 }
 
-// 47県ぶん読み込んで prefCityCodesMap を作る
 async function buildPrefCityCodesMap() {
-  const entries = Object.entries(prefCodeByName); // [ [県名, "01"], ... ]
+  const entries = Object.entries(prefCodeByName);
 
   await Promise.all(
     entries.map(async ([prefName, code]) => {
@@ -158,7 +155,6 @@ async function buildPrefCityCodesMap() {
 
         prefCityCodesMap.set(prefName, set);
       } catch (e) {
-        // 読めない県があってもアプリを止めない
         prefCityCodesMap.set(prefName, new Set());
       }
     })
@@ -174,7 +170,7 @@ function getPrefVisitedRatio(prefName) {
   for (const code of citySet) {
     if (visitedSet.has(normalizeCode(code))) hit++;
   }
-  return hit / citySet.size; // 0〜1
+  return hit / citySet.size;
 }
 
 function lerp(a, b, t) {
@@ -185,28 +181,19 @@ function clamp01(x) {
   return Math.max(0, Math.min(1, x));
 }
 
-// t=0(薄) → t=1(濃) のオレンジ
 function orangeGradient(t) {
   t = clamp01(t);
-
-  // 薄いオレンジ → 濃いオレンジ
   const c0 = { r: 255, g: 242, b: 204 };
   const c1 = { r: 255, g: 106, b: 0 };
-
   const r = Math.round(lerp(c0.r, c1.r, t));
   const g = Math.round(lerp(c0.g, c1.g, t));
   const b = Math.round(lerp(c0.b, c1.b, t));
-
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-// --------------------
-// 県別達成率リスト（開閉）
-// --------------------
 function renderPrefProgressList() {
   if (!prefProgressListEl) return;
 
-  // まだ47都道府県ぶんの市区町村Setを構築できてない段階もあるので保険
   if (!prefCityCodesMap || prefCityCodesMap.size === 0) {
     prefProgressListEl.innerHTML = "<div>集計中...</div>";
     return;
@@ -217,18 +204,14 @@ function renderPrefProgressList() {
   const rows = Object.keys(prefCodeByName).map(prefName => {
     const citySet = prefCityCodesMap.get(prefName) || new Set();
     const total = citySet.size;
-
     let hit = 0;
     for (const code of citySet) {
       if (visitedSet.has(normalizeCode(code))) hit++;
     }
-
     const pct = total ? (hit / total) * 100 : 0;
-
     return { prefName, hit, total, pct };
   });
 
-  // 都道府県コード順（01→47）
   rows.sort((a, b) => {
     const ca = Number(prefCodeByName[a.prefName] || 999);
     const cb = Number(prefCodeByName[b.prefName] || 999);
@@ -236,9 +219,7 @@ function renderPrefProgressList() {
   });
 
   prefProgressListEl.innerHTML = rows
-    .map(r => {
-      return `<div class="pref-row">${r.prefName}：${r.hit}/${r.total}（${r.pct.toFixed(1)}%）</div>`;
-    })
+    .map(r => `<div class="pref-row">${r.prefName}：${r.hit}/${r.total}（${r.pct.toFixed(1)}%）</div>`)
     .join("");
 }
 
@@ -260,31 +241,21 @@ function togglePrefProgressList() {
   else openPrefProgressList();
 }
 
-// --------------------
-// 初期化：都道府県表示
-// --------------------
 fetch("https://raw.githubusercontent.com/dataofjapan/land/master/japan.geojson")
   .then(r => r.json())
   .then(async data => {
     prefData = data;
-
-    // 県別コードマップを先に構築（全国のグラデ塗り、県別リストに必要）
     await buildPrefCityCodesMap();
-
     drawPrefectures();
   })
   .catch(() => alert("都道府県GeoJSONが読み込めません"));
 
-// --------------------
-// 日本全体（都道府県）
-// --------------------
 function drawPrefectures() {
   clearLayer();
   clearHoverTooltip();
   closePrefProgressList();
   if (backBtn) backBtn.style.display = "none";
 
-  // 右上進捗を「全国表示」にする
   currentPrefName = null;
   currentPrefCityCodes = new Set();
   updateProgressView();
@@ -292,9 +263,8 @@ function drawPrefectures() {
   currentLayer = L.geoJSON(prefData.features, {
     style: feature => {
       const prefName = feature.properties?.nam_ja || "不明";
-      const ratio = getPrefVisitedRatio(prefName); // 0〜1
+      const ratio = getPrefVisitedRatio(prefName);
       const fill = orangeGradient(ratio);
-
       return {
         color: "#000",
         weight: 1,
@@ -325,15 +295,27 @@ function drawPrefectures() {
         }
         loadCitiesGeojson(file, prefName);
       });
+
+      let pressTimer = null;
+      layer.on("mousedown touchstart", () => {
+        pressTimer = setTimeout(() => {
+          showMessage(prefName);
+        }, 600);
+      });
+      layer.on("mouseup touchend touchcancel mouseleave", () => {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      });
+      layer.on("mousemove touchmove", () => {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      });
     }
   }).addTo(map);
 
   map.fitBounds(currentLayer.getBounds());
 }
 
-// --------------------
-// 市区町村GeoJSON 読み込み → 表示
-// --------------------
 function loadCitiesGeojson(file, prefName) {
   fetch(file)
     .then(r => r.json())
@@ -341,16 +323,12 @@ function loadCitiesGeojson(file, prefName) {
     .catch(() => alert(`${file} が読み込めません`));
 }
 
-// --------------------
-// 市区町村表示
-// --------------------
 function showCities(featureCollection, prefName) {
   clearLayer();
   clearHoverTooltip();
   closePrefProgressList();
   if (backBtn) backBtn.style.display = "block";
 
-  // 進捗計算用に「今の県の市区町村コード一覧」を作る
   currentPrefName = prefName || null;
   currentPrefCityCodes = new Set(
     featureCollection.features
@@ -364,7 +342,6 @@ function showCities(featureCollection, prefName) {
     style: feature => {
       const code = normalizeCode(getCityCode(feature));
       const visitedFlag = code && getVisitedSet().has(code);
-
       return {
         color: "#000",
         weight: 1,
@@ -408,13 +385,27 @@ function showCities(featureCollection, prefName) {
         updateProgressView();
         if (prefListOpen) renderPrefProgressList();
       });
+
+      let pressTimer = null;
+      layer.on("mousedown touchstart", () => {
+        pressTimer = setTimeout(() => {
+          showMessage(name);
+        }, 600);
+      });
+      layer.on("mouseup touchend touchcancel mouseleave", () => {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      });
+      layer.on("mousemove touchmove", () => {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      });
     }
   }).addTo(map);
 
   map.fitBounds(currentLayer.getBounds());
 }
 
-// hover tooltip（必ず1つだけ）
 function showHoverTooltip(text, latlng) {
   if (!hoverTooltip) {
     hoverTooltip = L.tooltip({
@@ -464,10 +455,8 @@ function clearLayer() {
   currentLayer = null;
 }
 
-// 戻るボタン
 if (backBtn) backBtn.onclick = drawPrefectures;
 
-// #progress をボタン化（全国/県どっちの画面でも開閉できる）
 if (progressEl) {
   progressEl.style.cursor = "pointer";
   progressEl.title = "押すと都道府県別の達成率リストを表示/非表示";
@@ -476,5 +465,4 @@ if (progressEl) {
   });
 }
 
-// 起動直後も一応出しておく（fetch成功後に drawPrefectures で上書きされる）
 updateProgressView();
